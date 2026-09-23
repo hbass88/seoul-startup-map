@@ -90,7 +90,10 @@ a{color:var(--accent)}
 .muted{color:var(--ink2);font-size:12px}
 .applies{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
 .apply.alt{background:transparent;color:var(--accent);border:1px solid var(--accent)}
-.badge.jp{text-decoration:none;color:#0a7a55;background:#dff3ea}
+.reps{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.rep{display:flex;flex-direction:column;gap:2px;background:var(--bg);border-radius:10px;padding:10px;text-decoration:none;color:var(--ink)}
+.rep b{font-size:16px}
+.rep span{font-size:11px;color:var(--ink2)}
 .ext{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
 .ext a{display:block;text-align:center;text-decoration:none;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 4px;font-size:12px}
 .ext a:hover{border-color:var(--accent)}

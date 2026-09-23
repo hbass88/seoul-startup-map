@@ -37,14 +37,14 @@ const extLinks = c => {
   return [
     ['원티드', `https://www.wanted.co.kr/company/${c.id}`],
     ['THE VC', c.vc ? `https://thevc.kr/${c.vc}` : `https://thevc.kr/integrated-search/overview?keyword=${n}`],
-    ['혁신의숲', `https://www.innoforest.co.kr/search?keyword=${n}`],
+    ['혁신의숲', c.inno && c.inno.cp ? `https://www.innoforest.co.kr/company/${c.inno.cp}` : `https://www.innoforest.co.kr/search?keyword=${n}`],
     ['잡플래닛', c.jp ? `https://www.jobplanet.co.kr/companies/${c.jp.id}` : `https://www.jobplanet.co.kr/search?query=${n}`],
-    ['블라인드', `https://www.teamblind.com/kr/company/${n}`],
+    ['블라인드', `https://www.teamblind.com/kr/company/${c.bl ? enc(c.bl.name) : n}`],
     ['사람인', `https://www.saramin.co.kr/zf_user/search?searchword=${n}`],
     ['잡코리아', `https://www.jobkorea.co.kr/Search/?stext=${n}`],
-    ['그룹바이', `https://www.google.com/search?q=${enc('site:groupby.kr ' + c.n)}`],
+    ['그룹바이', `https://groupby.kr/search?keyword=${n}`],
     ['로켓펀치', `https://www.rocketpunch.com/companies?keywords=${n}`],
-    ['캐치', `https://www.catch.co.kr/Search/SearchList?Keyword=${n}`],
+    ['캐치', c.ct ? `https://www.catch.co.kr/Comp/CompSummary/${c.ct.id}` : `https://www.catch.co.kr/Search/SearchList?Keyword=${n}`],
     ['링크드인', `https://www.linkedin.com/search/results/companies/?keywords=${n}`],
     ['뉴스', `https://search.naver.com/search.naver?where=news&query=${n}`],
   ];
@@ -184,6 +184,18 @@ function jobCard(j) {
   </div>`;
 }
 
+function repSec(c) {
+  const cards = [];
+  if (c.jp && c.jp.rate) cards.push(`<a class="rep" target="_blank" rel="noopener" href="https://www.jobplanet.co.kr/companies/${c.jp.id}"><b>★ ${c.jp.rate}</b><span>잡플래닛</span></a>`);
+  if (c.bl && c.bl.rate) cards.push(`<a class="rep" target="_blank" rel="noopener" href="https://www.teamblind.com/kr/company/${enc(c.bl.name)}"><b>★ ${c.bl.rate}</b><span>블라인드${c.bl.reviews ? ' 리뷰 ' + fmtN(c.bl.reviews) : ''}${c.bl.rec != null ? ' · 추천 ' + c.bl.rec + '%' : ''}</span></a>`);
+  if (c.ct && (c.ct.rate || c.ct.fin)) cards.push(`<a class="rep" target="_blank" rel="noopener" href="https://www.catch.co.kr/Comp/CompSummary/${c.ct.id}"><b>${c.ct.rate ? '★ ' + c.ct.rate : '-'}</b><span>캐치${c.ct.fin ? ' · 재무 ' + c.ct.fin + '점' : ''}</span></a>`);
+  const tags = [...new Set([...(c.jp?.tags || [])])];
+  if (!cards.length && !c.bl?.sal) return '';
+  return `<div class="sec"><h3>평판</h3><div class="reps">${cards.join('')}</div>
+    ${c.bl && c.bl.sal ? `<div class="muted" style="margin-top:8px">블라인드 평균연봉 ${fmtN(c.bl.sal)}만원</div>` : ''}
+    ${tags.length ? `<div class="tags" style="margin-top:8px">${tags.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div>` : ''}</div>`;
+}
+
 function openDetail(id, pan) {
   const c = DATA.find(x => x.id === id); if (!c) return;
   selId = id;
@@ -205,10 +217,10 @@ function openDetail(id, pan) {
       </div>
     </div>
     <div class="badges">
-      <span class="badge stage" style="background:${stageColor(c.sk)}">${esc(c.stage || '투자단계 미확인')}${c.rounds ? ` (${c.rounds}회)` : ''}</span>
+      <span class="badge stage" style="background:${stageColor(c.sk)}" title="${esc(c.stageSrc || 'THE VC')}">${esc(c.stage || '투자단계 미확인')}${c.rounds ? ` (${c.rounds}회)` : ''}</span>
       ${c.inv ? `<span class="badge">${esc(c.inv)}</span>` : ''}
       <span class="badge ${c.origin === '외국계' ? 'foreign' : ''}">${esc(c.origin || '국적 미확인')}</span>
-      ${c.jp && c.jp.rate ? `<a class="badge jp" target="_blank" rel="noopener" href="https://www.jobplanet.co.kr/companies/${c.jp.id}">잡플래닛 ★${c.jp.rate}</a>` : ''}
+
       ${(c.badges || []).map(b => `<span class="badge">${esc(b)}</span>`).join('')}
     </div>
     <div class="sec"><h3>핵심 지표</h3>
@@ -221,8 +233,9 @@ function openDetail(id, pan) {
         <div class="kpi"><div class="v" style="font-size:${(c.fund||'').length > 7 ? 14 : 17}px">${c.fund ? esc(c.fund) : '-'}</div><div class="k">투자유치${c.fundAgo ? ' (최근 ' + esc(c.fundAgo) + ')' : ''}</div></div>
       </div>
       ${spark(c.chart)}
-      <div class="src">인원, 입퇴사, 연봉: 국민연금 가입 기준 (원티드 제공) · 매출: KODATA · 투자: THE VC${c.resp ? ` · 원티드 지원자 응답률 ${Math.round(c.resp)}%` : ''}</div>
+      <div class="src">인원, 입퇴사, 연봉: 국민연금 가입 기준 (원티드 제공) · 매출: KODATA · 투자: ${esc(c.stageSrc || 'THE VC')}${c.resp ? ` · 원티드 지원자 응답률 ${Math.round(c.resp)}%` : ''}</div>
     </div>
+    ${repSec(c)}
     <div class="sec"><h3>채용공고 ${jobs.length}건 (정규직 ${ft}, 기타 ${jobs.length - ft - unk}${unk ? `, 확인 전 ${unk}` : ''})</h3>
       <div class="muted" style="margin:-4px 0 10px">${Object.entries(srcCnt).map(([k, v]) => `${k} ${v}`).join(' · ')} · 같은 공고는 하나로 합침</div>
       <div class="jobs">${jobs.length ? jobs.map(jobCard).join('') : '<div class="muted">현재 열린 공고가 없습니다.</div>'}</div>
@@ -231,7 +244,7 @@ function openDetail(id, pan) {
       ${personCard('CEO', c.ceo, c)}
       ${personCard('CTO', c.cto, c)}
     </div></div>
-    ${c.desc ? `<div class="sec"><h3>회사 소개</h3><div class="desc">${esc(c.desc)}</div></div>` : ''}
+    ${c.desc || c.kw ? `<div class="sec"><h3>회사 소개</h3>${c.kw ? `<div class="muted" style="margin-bottom:6px">${esc(c.kw)}</div>` : ''}<div class="desc">${esc(c.desc || '')}</div></div>` : ''}
     ${(c.welfare || []).length ? `<div class="sec"><h3>보상 및 복지</h3><div class="tags">${c.welfare.map(t => `<span class="tag">${esc(t)}</span>`).join('')}</div></div>` : ''}
     <div class="sec"><h3>다른 사이트에서 보기</h3><div class="ext">
       ${extLinks(c).map(([t, u]) => `<a target="_blank" rel="noopener" href="${u}">${t}</a>`).join('')}

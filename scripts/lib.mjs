@@ -228,3 +228,12 @@ export function mergeJobs(jobs, extra, coNames) {
   }
   return out.map(({ _n, ...j }) => j);
 }
+export function gbJob(x) {
+  const e = x.exp || {};
+  return {
+    src: '그룹바이', url: `https://groupby.kr/positions/${x.id}`, t: x.t,
+    type: x.intern ? 'intern' : null,
+    career: x.career === '신입' ? '신입' : (e.min != null ? `경력 ${e.min}${e.max ? '~' + e.max : '+'}년` : x.career || null),
+    posted: x.pub ? x.pub.slice(0, 10) : null, due: null, loc: x.addr || null,
+  };
+}

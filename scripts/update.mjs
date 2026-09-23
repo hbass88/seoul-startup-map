@@ -4,7 +4,7 @@
 import fs from 'node:fs/promises';
 import {
   isCandidate, isStartup, buildCompany, wantedCompanyFromPage, wantedJobFromPage,
-  pickVcMatch, parseVcPage, pool, srJob, jkJob, mergeJobs,
+  pickVcMatch, parseVcPage, pool, srJob, jkJob, gbJob, mergeJobs,
 } from './lib.mjs';
 import { npsHistory } from './nps.mjs';
 
@@ -31,7 +31,7 @@ const get = async (url, type = 'text', tries = 3) => {
 };
 
 const state = JSON.parse(await fs.readFile(STATE, 'utf8').catch(() => '{}'));
-for (const k of ['co', 'vc', 'emp', 'jd', 'rejected', 'vcTried', 'nps', 'sr', 'jk', 'jp']) state[k] ||= {};
+for (const k of ['co', 'vc', 'emp', 'jd', 'rejected', 'vcTried', 'nps', 'sr', 'jk', 'jp', 'bl', 'ct', 'gb', 'inno']) state[k] ||= {};
 state.jobs ||= [];
 
 if (!process.argv.includes('--build-only')) {
@@ -110,10 +110,25 @@ const companies = Object.values(state.co)
   .map(c => {
     const b = buildCompany(c, state.vc[c.id], state.emp[c.id], byCid[c.id], state.nps[c.id]);
     const base = c.name.replace(/\(.*?\)/g, '').trim(), alias = (c.name.match(/\((.*?)\)/) || [])[1];
-    const extra = [...(state.sr[c.id] || []).map(srJob), ...(state.jk[c.id] || []).map(jkJob)];
+    const extra = [...(state.sr[c.id] || []).map(srJob), ...(state.jk[c.id] || []).map(jkJob), ...(state.gb[c.id] || []).map(gbJob)];
     b.jobs = mergeJobs(b.jobs, extra, [c.name, base, alias].filter(Boolean));
     const jp = state.jp[c.id];
     if (jp) b.jp = { id: jp.jp, rate: jp.rate, tags: jp.tags || [] };
+    const bl = state.bl[c.id];
+    if (bl) b.bl = { name: bl.name, rate: bl.rate, reviews: bl.reviews, rec: bl.rec, sal: bl.sal };
+    const ct = state.ct[c.id];
+    if (ct) {
+      b.ct = { id: ct.cid, rate: ct.review, fin: ct.fin, size: ct.size };
+      if (!b.stage && ct.stage) { b.stage = ct.stage.replace(/^시리즈\s*/, 'Series ').replace(/^시드$/, 'Seed').replace(/^프리/, 'Pre-'); b.stageSrc = '캐치'; }
+      if (!b.origin && ct.foreign) b.origin = '외국계';
+    }
+    const inno = state.inno[c.id];
+    if (inno) {
+      b.inno = inno;
+      if (!b.stage && inno.stage) { b.stage = inno.stage; b.stageSrc = '혁신의숲'; }
+      if ((!b.fund || b.fund === '100억 이상') && inno.fund) b.fund = inno.fund;
+      if (!b.kw && inno.kw) b.kw = inno.kw;
+    }
     return b;
   })
   .filter(c => c.lat && c.lng);
@@ -121,7 +136,7 @@ const meta = {
   updated: state.updated || new Date().toISOString(),
   companies: companies.length,
   jobs: companies.reduce((s, c) => s + c.jobs.length, 0),
-  sources: ['원티드 (공고, 기업정보, 국민연금 인원/연봉, KODATA 매출)', 'THE VC (투자단계, 투자유치, 대표자, 한국계/외국계)', '사람인, 잡코리아 (공고)', '잡플래닛 (평점)', '국민연금공단 공공데이터 (선택)'],
+  sources: ['원티드 (공고, 기업정보, 국민연금 인원/연봉, KODATA 매출)', 'THE VC (투자단계, 투자유치, 대표자, 한국계/외국계)', '사람인, 잡코리아 (공고)', '잡플래닛, 블라인드, 캐치 (평판, 재무평가)', '그룹바이 (공고)', '혁신의숲 (투자, 키워드)', '국민연금공단 공공데이터 (선택)'],
 };
 await fs.writeFile(OUT, JSON.stringify({ meta, companies }));
 await fs.writeFile(STATE, JSON.stringify(state));

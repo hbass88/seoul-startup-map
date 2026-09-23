@@ -9,13 +9,14 @@
     --bg:#0f1115; --panel:#171a20; --ink:#e8ebf0; --ink2:#9aa2b1; --line:#262a33;
     --accent:#5b8cff; --chip:#222731; --shadow:0 6px 24px rgba(0,0,0,.45); --s-na:#4a505c;
   }
+  :root:not([data-theme="light"]) .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) saturate(.2) brightness(.85) contrast(.9)}
 }
 :root[data-theme="dark"]{
   --bg:#0f1115; --panel:#171a20; --ink:#e8ebf0; --ink2:#9aa2b1; --line:#262a33;
   --accent:#5b8cff; --chip:#222731; --shadow:0 6px 24px rgba(0,0,0,.45); --s-na:#4a505c;
 }
 *{box-sizing:border-box}
-html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font-family:"Noto Sans KR",system-ui,-apple-system,sans-serif;font-size:14px}
+html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);color:var(--ink);font-family:"Noto Sans KR",system-ui,-apple-system,sans-serif;font-size:14px}
 button,select,input{font:inherit;color:inherit}
 a{color:var(--accent)}
 .top{height:56px;display:flex;align-items:center;justify-content:space-between;gap:12px;padding:0 16px;background:var(--panel);border-bottom:1px solid var(--line)}
@@ -26,7 +27,8 @@ a{color:var(--accent)}
 .layer-toggle .lbl{color:var(--ink2);font-size:12px;margin-right:4px}
 .layer-toggle button{border:1px solid var(--line);background:transparent;padding:5px 10px;border-radius:999px;cursor:pointer;font-size:12px}
 .layer-toggle button.on{background:var(--ink);color:var(--panel);border-color:var(--ink)}
-.layout{display:grid;grid-template-columns:340px 1fr;height:calc(100% - 56px);position:relative}
+.layout{display:grid;grid-template-columns:340px 1fr;height:calc(100% - 56px);position:relative;overflow:hidden}
+.leaflet-tile-pane{filter:saturate(.25) brightness(1.03)}
 .side{background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
 .filters{padding:12px;border-bottom:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
 .filters input[type=search],.filters select{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--bg)}

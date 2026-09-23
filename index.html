@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>서울 스타트업 지도</title>
+<meta name="description" content="서울 투자유치 스타트업의 위치, 채용공고, 인원 변화, 연봉, 매출, 투자단계를 지도 한 장에서.">
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <h1>서울 스타트업 지도</h1>
+    <span class="meta" id="meta">불러오는 중</span>
+  </div>
+  <div class="layer-toggle" role="group" aria-label="히트맵 기준">
+    <span class="lbl">히트맵</span>
+    <button data-heat="jobs" class="on">채용공고</button>
+    <button data-heat="emp">인원</button>
+    <button data-heat="growth">인원 순증</button>
+    <button data-heat="none">끄기</button>
+  </div>
+</header>
+
+<main class="layout">
+  <aside class="side" id="side">
+    <div class="filters">
+      <input id="q" type="search" placeholder="회사, 분야, 대표자 검색" autocomplete="off">
+      <div class="row">
+        <select id="f-ind"><option value="">전체 분야</option></select>
+        <select id="f-stage"><option value="">전체 투자단계</option></select>
+      </div>
+      <div class="row">
+        <select id="f-size">
+          <option value="">전체 인원</option>
+          <option value="0-50">50명 이하</option>
+          <option value="51-300">51~300명</option>
+          <option value="301-100000">301명 이상</option>
+        </select>
+        <select id="f-dist"><option value="">전체 구</option></select>
+      </div>
+      <div class="chips">
+        <label><input type="checkbox" id="f-hiring" checked> 채용중</label>
+        <label><input type="checkbox" id="f-fulltime"> 정규직 공고</label>
+        <label><input type="checkbox" id="f-foreign"> 외국계</label>
+        <label><input type="checkbox" id="f-growing"> 인원 순증 +</label>
+      </div>
+      <div class="row">
+        <select id="sort">
+          <option value="jobs">공고 많은 순</option>
+          <option value="recent">최근 공고 순</option>
+          <option value="emp">인원 많은 순</option>
+          <option value="growth">순증 많은 순</option>
+          <option value="salary">평균연봉 순</option>
+          <option value="sales">매출 순</option>
+          <option value="founded">최근 설립 순</option>
+        </select>
+        <span class="count" id="count"></span>
+      </div>
+    </div>
+    <ul class="list" id="list"></ul>
+  </aside>
+
+  <section class="mapwrap">
+    <div id="map"></div>
+    <div class="legend" id="legend"></div>
+    <button class="list-toggle" id="listToggle">목록</button>
+  </section>
+
+  <aside class="detail" id="detail" aria-hidden="true">
+    <button class="close" id="closeDetail" aria-label="닫기">×</button>
+    <div id="detailBody"></div>
+  </aside>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

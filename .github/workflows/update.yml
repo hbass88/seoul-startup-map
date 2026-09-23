@@ -1,0 +1,35 @@
+name: 데이터 갱신
+
+on:
+  schedule:
+    - cron: '0 21 * * *'   # 매일 06:00 KST
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-data
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: 수집
+        env:
+          DATA_GO_KR_KEY: ${{ secrets.DATA_GO_KR_KEY }}
+        run: node scripts/update.mjs
+      - name: 커밋
+        run: |
+          git config user.name "data-bot"
+          git config user.email "data-bot@users.noreply.github.com"
+          git add data/
+          git diff --cached --quiet && echo "변경 없음" && exit 0
+          git commit -m "data: $(date -u -d '+9 hour' '+%Y-%m-%d') 갱신"
+          git push

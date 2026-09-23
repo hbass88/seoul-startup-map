@@ -14,7 +14,8 @@ export const isCandidate = c =>
 
 // 최종 포함: 원티드 투자 태그가 있거나 THE VC에 투자 라운드가 확인된 스타트업
 export const isStartup = (c, vc) =>
-  isCandidate(c) && (hasInvest(c) || (vc && vc.stage && (!vc.type || /스타트업/.test(vc.type))));
+  isCandidate(c) &&
+  (hasInvest(c) || (vc && vc.stage && (!vc.type || /스타트업/.test(vc.type))));
 
 export function sumChart(chart) {
   const pts = (chart || []).filter(x => x[2] != null || x[3] != null);
@@ -59,7 +60,8 @@ export function buildCompany(w, vc, emp, jobs, nps) {
     vc: vc && vc.vc || null,
     origin,
     inv: inv[0] || null,
-    fund: inv.includes('누적투자100억이상') || inv.some(t => /유니콘/.test(t)) ? '100억 이상' : null,
+    fund: (vc && vc.fund) || (inv.includes('누적투자100억이상') || inv.some(t => /유니콘/.test(t)) ? '100억 이상' : null),
+    fundAgo: vc && vc.fund ? vc.fundAgo : null,
     welfare: tags.filter(([k]) => WELFARE_CATS.includes(k)).map(([, t]) => t),
     badges: tags.filter(([k]) => BADGE_CATS.includes(k)).map(([, t]) => t),
     resp: w.resp ? Math.round(+w.resp) : null,
@@ -79,7 +81,7 @@ function normRounds(r) {
   if (!r) return [];
   if (!Array.isArray(r)) {
     const line = String(r).split('\n').find(l => /[＞>→]/.test(l)) || '';
-    const steps = line.replace(/^[\s•\-*·]+/, '').split(/\s*[＞>→]\s*/).map(s => s.trim()).filter(s => s && s.length < 30);
+    const steps = line.replace(/^[\s•\-*·|:0-9.)]+/, '').replace(/^(채용\s*)?전형\s*(절차|단계)?\s*[:：|]?\s*/, '').replace(/^[^:：]{1,12}[:：]\s*/, '').split(/\s*[＞>→]\s*/).map(s => s.trim()).filter(s => s && s.length < 30);
     return steps.length >= 2 ? steps : [];
   }
   return r.map(x => typeof x === 'string' ? x : (x.title || x.name || x.text || x.round_name || '')).filter(Boolean);
@@ -130,7 +132,9 @@ export function pickVcMatch(list, name) {
 export function parseVcPage(m, html) {
   const d = (html.match(/name="description" content="([^"]*)"/) || [])[1] || '';
   const t = strip(html);
-  const rd = t.match(/투자 라운드 \((\d+)건\) ([A-Za-z0-9&\-. ]+?|[가-힣A-Za-z0-9-]+) (?:투자|<|$)/);
+  const rd = t.match(/투자 라운드 \((\d+)건\) (.+?) 투자 유치/);
+  const fu = t.match(/투자 유치 \(([^)]*)\) ([\d,.]+(?:조|억|만)?[^ ]*) /);
+  const st = t.match(/상태 (비상장|상장|폐업|인수합병|[가-힣]+) /);
   const fy = d.match(/(\d{4})년 (\d{1,2})월에 설립/);
   const ceo = d.match(/대표자는 (.+?)입니다/);
   const org = d.match(/(한국계|외국계)/);
@@ -140,6 +144,7 @@ export function parseVcPage(m, html) {
     stage: rd ? rd[2].trim() : null, rounds: rd ? +rd[1] : null,
     fy: fy ? fy[1] + '-' + fy[2].padStart(2, '0') : null, ceo: ceo ? ceo[1] : null,
     origin: org ? org[1] : null, vcEmp: emp ? [emp[1], +emp[2].replace(/,/g, '')] : null,
+    fund: fu && !/필요/.test(fu[2]) ? fu[2] : null, fundAgo: fu ? fu[1] : null, status: st ? st[1] : null,
   };
 }
 
@@ -154,4 +159,72 @@ export async function pool(items, n, fn, delay = 0) {
     }
   }));
   return !stop;
+}
+
+// ---- 사람인 / 잡코리아 공고 병합 ----
+const tnorm = (s, co) => {
+  let x = String(s || '').toLowerCase();
+  for (const n of co) if (n) x = x.split(n.toLowerCase()).join('');
+  return x.replace(/\[[^\]]*\]|\([^)]*\)|【[^】]*】/g, ' ').replace(/[^0-9a-z가-힣]/g, '');
+};
+const bigrams = s => { const b = new Set(); for (let i = 0; i < s.length - 1; i++) b.add(s.slice(i, i + 2)); return b; };
+const sim = (a, b) => {
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  if (a.length >= 6 && b.length >= 6 && (a.includes(b) || b.includes(a))) return 0.9;
+  const A = bigrams(a), B = bigrams(b); let n = 0; for (const x of A) if (B.has(x)) n++;
+  return (2 * n) / (A.size + B.size || 1);
+};
+const yearFix = (mm, dd, ref = new Date()) => {
+  let y = ref.getFullYear();
+  const d = new Date(y, mm - 1, dd);
+  if (d - ref > 200 * 864e5) y -= 1; else if (ref - d > 200 * 864e5) y += 1;
+  return `${y}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+};
+const typeFrom = arr => {
+  const s = (arr || []).join(' ');
+  if (/정규직/.test(s)) return 'regular';
+  if (/계약직/.test(s)) return 'contract';
+  if (/인턴/.test(s)) return 'intern';
+  if (/파견/.test(s)) return 'dispatch';
+  if (/프리랜서/.test(s)) return 'freelancer';
+  return null;
+};
+
+export function srJob(x) {
+  const reg = (x.d || '').match(/(\d\d)\/(\d\d)\/(\d\d)/);
+  const due = (x.due || '').match(/(\d\d)\/(\d\d)/);
+  return {
+    src: '사람인', url: `https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=${x.idx}`, t: x.t,
+    type: typeFrom(x.cond), career: (x.cond || []).find(c => /신입|경력/.test(c)) || null,
+    posted: reg ? `20${reg[1]}-${reg[2]}-${reg[3]}` : null,
+    due: due ? yearFix(+due[1], +due[2]) : null, loc: (x.cond || [])[0] || null,
+  };
+}
+export function jkJob(x) {
+  const reg = (x.reg || '').match(/(\d\d)\/(\d\d)/);
+  const due = (x.due || '').match(/(\d\d)\/(\d\d)/);
+  return {
+    src: '잡코리아', url: `https://www.jobkorea.co.kr/Recruit/GI_Read/${x.gid}`, t: x.t,
+    type: typeFrom([x.type, x.kw]), career: x.career || null,
+    posted: reg ? yearFix(+reg[1], +reg[2]) : null, due: due ? yearFix(+due[1], +due[2]) : null, loc: x.loc || null,
+  };
+}
+
+// 원티드 공고(jobs)에 사람인/잡코리아 공고(extra)를 붙인다. 제목이 비슷하면 하나로 합치고 지원 링크만 추가.
+export function mergeJobs(jobs, extra, coNames) {
+  const out = jobs.map(j => ({ ...j, links: [{ src: '원티드', url: `https://www.wanted.co.kr/wd/${j.id}` }], _n: tnorm(j.t, coNames) }));
+  for (const e of extra) {
+    const n = tnorm(e.t, coNames);
+    let best = null, bs = 0;
+    for (const o of out) { const s = sim(n, o._n); if (s > bs) { bs = s; best = o; } }
+    if (best && bs >= 0.72) {
+      if (!best.links.some(l => l.src === e.src)) best.links.push({ src: e.src, url: e.url });
+      best.type ||= e.type; best.posted ||= e.posted; best.due ||= e.due;
+      if (!best.careerTxt && e.career) best.careerTxt = e.career;
+    } else {
+      out.push({ id: null, t: e.t, type: e.type, posted: e.posted, due: e.due, careerTxt: e.career, rounds: [], links: [{ src: e.src, url: e.url }], _n: n });
+    }
+  }
+  return out.map(({ _n, ...j }) => j);
 }

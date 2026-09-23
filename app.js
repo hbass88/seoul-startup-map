@@ -38,7 +38,7 @@ const extLinks = c => {
     ['원티드', `https://www.wanted.co.kr/company/${c.id}`],
     ['THE VC', c.vc ? `https://thevc.kr/${c.vc}` : `https://thevc.kr/integrated-search/overview?keyword=${n}`],
     ['혁신의숲', `https://www.innoforest.co.kr/search?keyword=${n}`],
-    ['잡플래닛', `https://www.jobplanet.co.kr/search?query=${n}`],
+    ['잡플래닛', c.jp ? `https://www.jobplanet.co.kr/companies/${c.jp.id}` : `https://www.jobplanet.co.kr/search?query=${n}`],
     ['블라인드', `https://www.teamblind.com/kr/company/${n}`],
     ['사람인', `https://www.saramin.co.kr/zf_user/search?searchword=${n}`],
     ['잡코리아', `https://www.jobkorea.co.kr/Search/?stext=${n}`],
@@ -165,7 +165,8 @@ function jobCard(j) {
   const isCt = j.type && !/regular|정규/i.test(j.type);
   const typeCls = !j.type ? '' : isCt ? 'ct' : 'ft';
   const rounds = (j.rounds || []).map(r => typeof r === 'string' ? r : (r.title || r.name || r.text || '')).filter(Boolean);
-  const career = j.newbie ? '신입 가능' : (j.af != null ? (j.af === 0 ? `신입~${j.at && j.at < 100 ? j.at + '년' : '무관'}` : `경력 ${j.af}${j.at && j.at < 100 ? '~' + j.at : '+'}년`) : '');
+  const career = j.newbie ? '신입 가능' : (j.af != null ? (j.af === 0 ? `신입~${j.at && j.at < 100 ? j.at + '년' : '무관'}` : `경력 ${j.af}${j.at && j.at < 100 ? '~' + j.at : '+'}년`) : (j.careerTxt || ''));
+  const links = j.links && j.links.length ? j.links : [{ src: '원티드', url: `https://www.wanted.co.kr/wd/${j.id}` }];
   return `<div class="job">
     <div class="job-t">${esc(j.t)}</div>
     <div class="job-m">
@@ -178,8 +179,8 @@ function jobCard(j) {
     <div class="job-r">${j.posted ? `게시 ${fmtDate(j.posted)} (${agoTxt(j.posted)}) · ` : ''}마감 ${j.due ? fmtDate(j.due) : '상시'}</div>
     ${rounds.length ? `<div class="job-r">전형: ${rounds.map(esc).join(' → ')}</div>` : ''}
     ${j.note ? `<div class="job-r">${esc(j.note)}</div>` : ''}
-    <div class="job-foot"><span class="muted">원티드</span>
-      <a class="apply" target="_blank" rel="noopener" href="https://www.wanted.co.kr/wd/${j.id}">지원하기</a></div>
+    <div class="job-foot"><span class="muted">${links.length > 1 ? links.length + '개 사이트에 게시' : esc(links[0].src)}</span>
+      <span class="applies">${links.map((l, i) => `<a class="apply${i ? ' alt' : ''}" target="_blank" rel="noopener" href="${esc(l.url)}">${links.length > 1 ? esc(l.src) + ' ' : ''}지원</a>`).join('')}</span></div>
   </div>`;
 }
 
@@ -190,6 +191,7 @@ function openDetail(id, pan) {
   if (pan) map.flyTo([c.lat, c.lng], Math.max(map.getZoom(), 15), { duration: .6 });
   const net = c.net12;
   const jobs = [...c.jobs].sort((a, b) => (b.posted || '') > (a.posted || '') ? 1 : -1);
+  const srcCnt = {}; jobs.forEach(j => (j.links || [{ src: '원티드' }]).forEach(l => srcCnt[l.src] = (srcCnt[l.src] || 0) + 1));
   const ft = jobs.filter(j => j.type && /regular|정규/i.test(j.type)).length;
   const unk = jobs.filter(j => !j.type).length;
   $('#detailBody').innerHTML = `
@@ -206,6 +208,7 @@ function openDetail(id, pan) {
       <span class="badge stage" style="background:${stageColor(c.sk)}">${esc(c.stage || '투자단계 미확인')}${c.rounds ? ` (${c.rounds}회)` : ''}</span>
       ${c.inv ? `<span class="badge">${esc(c.inv)}</span>` : ''}
       <span class="badge ${c.origin === '외국계' ? 'foreign' : ''}">${esc(c.origin || '국적 미확인')}</span>
+      ${c.jp && c.jp.rate ? `<a class="badge jp" target="_blank" rel="noopener" href="https://www.jobplanet.co.kr/companies/${c.jp.id}">잡플래닛 ★${c.jp.rate}</a>` : ''}
       ${(c.badges || []).map(b => `<span class="badge">${esc(b)}</span>`).join('')}
     </div>
     <div class="sec"><h3>핵심 지표</h3>
@@ -215,13 +218,14 @@ function openDetail(id, pan) {
         <div class="kpi"><div class="v">${c.h12 == null ? '-' : fmtN(c.h12) + ' / ' + fmtN(c.l12)}</div><div class="k">${periodTxt(c)} 입사 / 퇴사</div></div>
         <div class="kpi"><div class="v">${fmtWon(c.sal)}</div><div class="k">평균연봉</div></div>
         <div class="kpi"><div class="v">${fmtWon(c.sales)}</div><div class="k">매출${c.salesY ? ' (' + c.salesY.slice(0, 4) + ')' : ''}</div></div>
-        <div class="kpi"><div class="v">${c.fund ? esc(c.fund) : '-'}</div><div class="k">누적 투자유치</div></div>
+        <div class="kpi"><div class="v" style="font-size:${(c.fund||'').length > 7 ? 14 : 17}px">${c.fund ? esc(c.fund) : '-'}</div><div class="k">투자유치${c.fundAgo ? ' (최근 ' + esc(c.fundAgo) + ')' : ''}</div></div>
       </div>
       ${spark(c.chart)}
-      <div class="src">인원, 입퇴사, 연봉: 국민연금 가입 기준 (원티드 제공) · 매출: KODATA · 투자단계: THE VC 공개 정보${c.resp ? ` · 원티드 지원자 응답률 ${Math.round(c.resp)}%` : ''}</div>
+      <div class="src">인원, 입퇴사, 연봉: 국민연금 가입 기준 (원티드 제공) · 매출: KODATA · 투자: THE VC${c.resp ? ` · 원티드 지원자 응답률 ${Math.round(c.resp)}%` : ''}</div>
     </div>
     <div class="sec"><h3>채용공고 ${jobs.length}건 (정규직 ${ft}, 기타 ${jobs.length - ft - unk}${unk ? `, 확인 전 ${unk}` : ''})</h3>
-      <div class="jobs">${jobs.length ? jobs.map(jobCard).join('') : '<div class="muted">현재 원티드에 열린 공고가 없습니다.</div>'}</div>
+      <div class="muted" style="margin:-4px 0 10px">${Object.entries(srcCnt).map(([k, v]) => `${k} ${v}`).join(' · ')} · 같은 공고는 하나로 합침</div>
+      <div class="jobs">${jobs.length ? jobs.map(jobCard).join('') : '<div class="muted">현재 열린 공고가 없습니다.</div>'}</div>
     </div>
     <div class="sec"><h3>경영진</h3><div class="people">
       ${personCard('CEO', c.ceo, c)}
@@ -252,7 +256,7 @@ async function load() {
     c.sk = stageKey(c.stage);
     c.jobs = c.jobs || [];
     c.lastPosted = c.jobs.reduce((m, j) => (j.posted || '') > m ? j.posted : m, '');
-    c._s = [c.n, c.ind, c.nts, c.ceo, c.dist, c.stage, ...(c.jobs.map(j => j.t))].join(' ').toLowerCase();
+    c._s = [c.n, c.ind, c.nts, c.ceo, c.dist, c.stage, c.market, ...(c.jobs.map(j => j.t))].join(' ').toLowerCase();
   }
   const cnt = k => Object.entries(DATA.reduce((m, c) => (c[k] && (m[c[k]] = (m[c[k]] || 0) + 1), m), {})).sort((a, b) => b[1] - a[1]);
   fillSelect($('#f-ind'), cnt('ind').map(([k, n]) => [k, `${k} (${n})`]));

@@ -21,9 +21,13 @@
 2. 상장사, 대기업, 1,000명 초과 제외
 3. 원티드 투자 태그(누적투자 100억 이상, 예비/아기 유니콘, 유니콘브릿지, VC 포트폴리오 등)가 있거나, THE VC에서 투자 라운드가 확인된 회사
 
-## 자동 갱신
+## 갱신
 
-`.github/workflows/update.yml` 이 매일 06:00 (KST) 에 돌면서
+원티드와 THE VC 모두 GitHub Actions 클라우드 IP를 차단합니다(403, CAPTCHA). 그래서 지금은 **필요할 때 로그인된 크롬에서 수집해 반영**하는 방식입니다.
+`scripts/browser-collect.js` 를 원티드 탭 콘솔에서 실행하면 IndexedDB 에 쌓이고, 결과 JSON 을 내려받아 `data/state.json` 에 합친 뒤
+`node scripts/update.mjs --build-only` 로 `companies.json` 을 다시 만듭니다.
+
+맥을 self-hosted runner 로 등록하면 아래 워크플로를 매일 자동으로 돌릴 수 있습니다. `.github/workflows/update.yml` 은
 
 - 서울 공고 전체를 다시 받고, 닫힌 공고는 빼고 새 공고는 상세(게시일, 전형, 고용형태)까지 채웁니다
 - 새로 나타난 회사 중 조건에 맞는 곳을 추가합니다

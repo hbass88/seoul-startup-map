@@ -88,6 +88,9 @@ a{color:var(--accent)}
 .job-foot{display:flex;justify-content:space-between;align-items:center;margin-top:8px;gap:8px}
 .apply{background:var(--accent);color:var(--accent-ink);text-decoration:none;padding:7px 14px;border-radius:8px;font-weight:700;font-size:13px;white-space:nowrap}
 .muted{color:var(--ink2);font-size:12px}
+.applies{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.apply.alt{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+.badge.jp{text-decoration:none;color:#0a7a55;background:#dff3ea}
 .ext{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
 .ext a{display:block;text-align:center;text-decoration:none;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 4px;font-size:12px}
 .ext a:hover{border-color:var(--accent)}

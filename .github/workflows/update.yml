@@ -1,8 +1,10 @@
 name: 데이터 갱신
 
+# 원티드와 THE VC가 GitHub 클라우드 IP를 차단해서 기본 스케줄은 꺼둠.
+# 맥을 self-hosted runner로 등록하고 저장소 변수 RUNNER_LABEL=self-hosted 를 넣으면 아래 schedule 주석을 풀어 쓰면 됨.
 on:
-  schedule:
-    - cron: '0 21 * * *'   # 매일 06:00 KST
+  # schedule:
+  #   - cron: '0 21 * * *'   # 매일 06:00 KST
   workflow_dispatch:
 
 permissions:
@@ -14,7 +16,7 @@ concurrency:
 
 jobs:
   update:
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.RUNNER_LABEL || 'ubuntu-latest' }}
     timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4

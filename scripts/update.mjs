@@ -46,8 +46,9 @@ if (!process.argv.includes('--build-only')) {
     }
   } catch (e) { log('원티드 공고 수집 실패:', e.message); }
   log('공고', jobs.length);
-  if (jobs.length < 1000) { log('공고 수가 비정상적으로 적어 이번 갱신을 건너뜀'); process.exit(0); }
-  state.jobs = jobs;
+  const wantedOk = jobs.length >= 1000;
+  if (!wantedOk) { log('원티드 접근 불가(차단 등). 공고/회사 갱신은 건너뛰고 THE VC 보강만 진행'); jobs = state.jobs; }
+  else state.jobs = jobs;
 
   // 2. 회사: 신규는 탐지, 기존은 7일마다 새로고침
   const ids = [...new Set(jobs.map(j => j.cid))];
@@ -55,8 +56,8 @@ if (!process.argv.includes('--build-only')) {
     if (state.co[id]) return now - (state.co[id]._t || 0) > 7 * DAY;
     return !state.rejected[id] || now - state.rejected[id] > 30 * DAY;
   });
-  log('회사 페이지 조회', todo.length);
-  await pool(todo.slice(0, 800), 3, async id => {
+  log('회사 페이지 조회', wantedOk ? todo.length : 0);
+  if (wantedOk) await pool(todo.slice(0, 800), 3, async id => {
     const html = await get(`${W}/company/${id}`);
     const w = html && wantedCompanyFromPage(id, html);
     if (w && isCandidate(w)) { state.co[id] = { ...w, _t: now }; delete state.rejected[id]; }
@@ -80,22 +81,25 @@ if (!process.argv.includes('--build-only')) {
   // 4. 공고 상세 (게시일, 고용형태, 전형)
   const incl = new Set(Object.values(state.co).filter(c => isStartup(c, state.vc[c.id])).map(c => c.id));
   const jdTodo = jobs.filter(j => incl.has(j.cid) && !state.jd[j.id]);
-  log('공고 상세', jdTodo.length);
-  const jdOk = await pool(jdTodo.slice(0, 2000), 2, async j => {
+  log('공고 상세', wantedOk ? jdTodo.length : 0);
+  const jdOk = !wantedOk || await pool(jdTodo.slice(0, 2000), 2, async j => {
     const html = await get(`${W}/wd/${j.id}`);
     const d = html && wantedJobFromPage(html);
     if (d) state.jd[j.id] = d;
   }, 400);
   if (!jdOk) log('원티드 공고 상세 차단 감지, 다음 실행에서 이어서');
-  const open = new Set(jobs.map(j => String(j.id)));
-  for (const k of Object.keys(state.jd)) if (!open.has(k)) delete state.jd[k];
+  if (wantedOk) {
+    const open = new Set(jobs.map(j => String(j.id)));
+    for (const k of Object.keys(state.jd)) if (!open.has(k)) delete state.jd[k];
+  }
 
   // 5. 국민연금 월별 입사/퇴사 (DATA_GO_KR_KEY 있을 때만)
   if (process.env.DATA_GO_KR_KEY) {
     try { await npsHistory(state, [...incl], process.env.DATA_GO_KR_KEY, log); }
     catch (e) { log('국민연금 API 실패:', e.message); }
   }
-  state.updated = new Date().toISOString();
+  if (wantedOk) state.updated = new Date().toISOString();
+  state.vcUpdated = new Date().toISOString();
 }
 
 // 6. companies.json 생성

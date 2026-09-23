@@ -30,7 +30,9 @@ const periodTxt = c => !c.hm ? '1년' : c.hm >= 12 ? '1년' : c.hm === 1 ? `${(c
 const EMP_TYPE = { regular: '정규직', contract: '계약직', intern: '인턴', freelancer: '프리랜서', part_time: '파트타임', dispatch: '파견직', REGULAR: '정규직', CONTRACT: '계약직', INTERN: '인턴' };
 const empTypeTxt = t => t ? (EMP_TYPE[t] || t) : '정보없음';
 
-let DATA = [], META = {}, map, heat, bubbles, heatMode = 'jobs', selId = null, filtered = [];
+const ROLES = [['dev', '개발'], ['data', '데이터·AI'], ['qa', 'QA·테스트'], ['design', '디자인'], ['pm', '기획·PM'], ['mkt', '마케팅'], ['sales', '영업·BD'], ['biz', '경영·HR·재무'], ['ops', '운영·CS'], ['etc', '기타']];
+const roleName = k => (ROLES.find(r => r[0] === k) || [0, ''])[1];
+let bubbleRenderer, DATA = [], META = {}, map, heat, bubbles, heatMode = 'jobs', selId = null, filtered = [], role = '', jobTab = 'role';
 
 const extLinks = c => {
   const n = enc(c.n.replace(/\(.*?\)/g, '').trim() || c.n);
@@ -51,7 +53,11 @@ const extLinks = c => {
 };
 
 function initMap() {
-  map = L.map('map', { zoomControl: true, preferCanvas: true }).setView([37.5326, 126.99], 12);
+  map = L.map('map', { zoomControl: false }).setView([37.5326, 126.99], 12);
+  L.control.zoom({ position: 'bottomright' }).addTo(map);
+  map.createPane('heatPane'); map.getPane('heatPane').style.zIndex = 350; map.getPane('heatPane').style.pointerEvents = 'none';
+  map.createPane('bubblePane'); map.getPane('bubblePane').style.zIndex = 450;
+  bubbleRenderer = L.svg({ pane: 'bubblePane', padding: 0.5 });
   L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
     maxZoom: 19, attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
   }).addTo(map);
@@ -71,22 +77,34 @@ function drawMap() {
   if (heatMode !== 'none') {
     const pts = filtered.map(c => [c.lat, c.lng, heatWeight(c)]).filter(p => p[2] > 0);
     const max = Math.max(1, ...pts.map(p => p[2])) * 0.5;
-    heat = L.heatLayer(pts, { radius: 28, blur: 22, maxZoom: 15, max, minOpacity: 0.25,
-      gradient: { 0.2: '#3b82f6', 0.45: '#22c55e', 0.7: '#facc15', 0.9: '#f97316', 1: '#dc2626' } }).addTo(map);
+    heat = L.heatLayer(pts, { pane: 'heatPane', radius: 30, blur: 24, maxZoom: 15, max, minOpacity: 0.2,
+      gradient: { 0.15: '#c7d2fe', 0.4: '#818cf8', 0.65: '#a855f7', 0.85: '#ec4899', 1: '#f43f5e' } }).addTo(map);
   }
-  for (const c of filtered) {
+  for (const c of [...filtered].sort((a, b) => (b.emp || 0) - (a.emp || 0))) {
     const r = Math.max(5, Math.min(26, 3 + Math.sqrt(c.emp || 1) * 1.1));
     const col = cssVar(stageColor(c.sk));
-    const m = L.circleMarker([c.lat, c.lng], { radius: r, color: '#fff', weight: 1, fillColor: col, fillOpacity: .78 });
-    m.bindTooltip(`<div class="bubble-tip"><b>${esc(c.n)}</b><br>${esc(c.ind || '')} · ${fmtN(c.emp)}명 · 공고 ${c.jobsShown}건${c.stage ? '<br>' + esc(c.stage) : ''}</div>`, { direction: 'top', offset: [0, -r] });
-    m.on('click', () => openDetail(c.id, false));
+    const m = L.circleMarker([c.lat, c.lng], { renderer: bubbleRenderer, pane: 'bubblePane', radius: r, color: '#fff', weight: 1.5, fillColor: col, fillOpacity: c.id === selId ? 1 : .82, bubblingMouseEvents: false });
+    m.bindTooltip(`<b>${esc(c.n)}</b><br>${esc(c.stage || c.ind || '')} · ${fmtN(c.emp)}명<br>${role ? roleName(role) + ' ' : ''}공고 ${c.jobsShown}건`, { direction: 'top', offset: [0, -r], className: 'tip' });
+    m.on('click', e => { L.DomEvent.stopPropagation(e); openDetail(c.id, false); });
+    m.on('mouseover', () => m.setStyle({ weight: 3, fillOpacity: 1 }));
+    m.on('mouseout', () => m.setStyle({ weight: 1.5, fillOpacity: c.id === selId ? 1 : .82 }));
     bubbles.addLayer(m);
   }
 }
 
+function drawRoles() {
+  const f = currentFilters();
+  const base = DATA.filter(c => (!f.ind || c.ind === f.ind) && (!f.stage || c.sk === f.stage) && (!f.dist || c.dist === f.dist) && (!f.q || c._s.includes(f.q)));
+  const cnt = {}; let all = 0;
+  for (const c of base) for (const j of c.jobs) { cnt[j.role] = (cnt[j.role] || 0) + 1; all++; }
+  $('#roles').innerHTML = `<button class="role ${role ? '' : 'on'}" data-role="">전체 직무 <em>${all.toLocaleString()}</em></button>` +
+    ROLES.map(([k, t]) => `<button class="role ${role === k ? 'on' : ''}" data-role="${k}">${t} <em>${(cnt[k] || 0).toLocaleString()}</em></button>`).join('');
+  $('#roles').querySelectorAll('.role').forEach(b => b.onclick = () => { role = b.dataset.role; jobTab = 'role'; listLimit = 150; apply(); if (selId) openDetail(selId, false); });
+}
+
 function drawLegend() {
   const items = STAGES.map(([k, t, col]) => `<span><i style="background:${col}"></i>${t}</span>`).join('') +
-    `<span><i style="background:var(--s-na)"></i>단계 미확인</span><span class="muted">버블 크기 = 인원</span>`;
+    `<span><i style="background:var(--s-na)"></i>단계 미확인</span><span>크기 = 인원</span>`;
   $('#legend').innerHTML = items;
 }
 
@@ -102,7 +120,8 @@ function currentFilters() {
 function apply() {
   const f = currentFilters();
   filtered = DATA.filter(c => {
-    c.jobsShown = f.ft ? c.jobs.filter(j => !j.type || /regular|정규/i.test(j.type)).length : c.jobs.length;
+    c.jobsShown = c.jobs.filter(j => (!role || j.role === role) && (!f.ft || !j.type || /regular|정규/i.test(j.type))).length;
+    if (role && !c.jobsShown) return false;
     if (f.hiring && !c.jobsShown) return false;
     if (f.ind && c.ind !== f.ind) return false;
     if (f.stage && c.sk !== f.stage) return false;
@@ -118,7 +137,8 @@ function apply() {
     sales: c => c.sales || 0, founded: c => c.fy || 0, recent: c => c.lastPosted || ''
   }[f.sort];
   filtered.sort((a, b) => (key(b) > key(a) ? 1 : key(b) < key(a) ? -1 : 0));
-  $('#count').textContent = `${filtered.length.toLocaleString()}개 회사 · 공고 ${filtered.reduce((s, c) => s + c.jobsShown, 0).toLocaleString()}건`;
+  $('#count').innerHTML = `<b>${filtered.length.toLocaleString()}</b>개 회사 · ${role ? esc(roleName(role)) + ' ' : ''}공고 <b>${filtered.reduce((s, c) => s + c.jobsShown, 0).toLocaleString()}</b>건`;
+  drawRoles();
   drawList();
   drawMap();
 }
@@ -130,11 +150,10 @@ function drawList() {
     <li data-id="${c.id}" class="${c.id === selId ? 'sel' : ''}">
       <img class="logo" loading="lazy" src="${esc(c.logo || '')}" alt="" onerror="this.style.visibility='hidden'">
       <div class="li-main">
-        <div class="li-name">${esc(c.n)}</div>
-        <div class="li-sub">${esc(c.ind || '')} · ${esc(c.dist || '')}${c.stage ? ' · ' + esc(c.stage) : ''}</div>
-        <div class="li-sub">${fmtN(c.emp)}명${c.net12 != null ? ` (${periodTxt(c)} ${c.net12 >= 0 ? '+' : ''}${c.net12})` : ''}${c.sal ? ' · 평균 ' + fmtWon(c.sal) : ''}</div>
+        <div class="li-name"><span style="overflow:hidden;text-overflow:ellipsis">${esc(c.n)}</span>${c.stage ? `<span class="pill" style="background:${stageColor(c.sk)}">${esc(c.stage.replace('Series ', ''))}</span>` : ''}</div>
+        <div class="li-sub">${esc(c.ind || '')} · ${esc(c.dist || '')} · ${fmtN(c.emp)}명${c.net12 ? ` <span style="color:${c.net12 > 0 ? 'var(--good)' : 'var(--bad)'}">${c.net12 > 0 ? '+' : ''}${c.net12}</span>` : ''}</div>
       </div>
-      <div class="li-right"><b>${c.jobsShown}</b><br>공고</div>
+      <div class="li-right"><b>${c.jobsShown}</b><span>공고</span></div>
     </li>`).join('') + (filtered.length > listLimit ? `<li><button class="more" id="moreBtn">더 보기 (${filtered.length - listLimit})</button></li>` : '');
   ul.querySelectorAll('li[data-id]').forEach(li => li.onclick = () => openDetail(+li.dataset.id, true));
   const mb = $('#moreBtn'); if (mb) mb.onclick = e => { e.stopPropagation(); listLimit += 200; drawList(); };
@@ -171,8 +190,8 @@ function jobCard(j) {
     <div class="job-t">${esc(j.t)}</div>
     <div class="job-m">
       <span class="${typeCls}">${esc(j.type ? empTypeTxt(j.type) : '고용형태 확인 전')}</span>
+      ${j.role ? `<span class="rl">${esc(roleName(j.role))}</span>` : ''}
       ${career ? `<span>${esc(career)}</span>` : ''}
-      ${j.cat ? `<span>${esc(j.cat)}</span>` : ''}
       ${j.remote ? '<span>원격 가능</span>' : ''}
       ${j.visa ? '<span>비자 지원</span>' : ''}
     </div>
@@ -202,7 +221,8 @@ function openDetail(id, pan) {
   document.querySelectorAll('.list li').forEach(li => li.classList.toggle('sel', +li.dataset.id === id));
   if (pan) map.flyTo([c.lat, c.lng], Math.max(map.getZoom(), 15), { duration: .6 });
   const net = c.net12;
-  const jobs = [...c.jobs].sort((a, b) => (b.posted || '') > (a.posted || '') ? 1 : -1);
+  const allJobs = [...c.jobs].sort((a, b) => (b.posted || '') > (a.posted || '') ? 1 : -1);
+  const jobs = role && jobTab === 'role' ? allJobs.filter(j => j.role === role) : allJobs;
   const srcCnt = {}; jobs.forEach(j => (j.links || [{ src: '원티드' }]).forEach(l => srcCnt[l.src] = (srcCnt[l.src] || 0) + 1));
   const ft = jobs.filter(j => j.type && /regular|정규/i.test(j.type)).length;
   const unk = jobs.filter(j => !j.type).length;
@@ -236,7 +256,8 @@ function openDetail(id, pan) {
       <div class="src">인원, 입퇴사, 연봉: 국민연금 가입 기준 (원티드 제공) · 매출: KODATA · 투자: ${esc(c.stageSrc || 'THE VC')}${c.resp ? ` · 원티드 지원자 응답률 ${Math.round(c.resp)}%` : ''}</div>
     </div>
     ${repSec(c)}
-    <div class="sec"><h3>채용공고 ${jobs.length}건 (정규직 ${ft}, 기타 ${jobs.length - ft - unk}${unk ? `, 확인 전 ${unk}` : ''})</h3>
+    <div class="sec"><h3>채용공고 ${jobs.length}건 · 정규직 ${ft}${unk ? ` · 확인 전 ${unk}` : ''}</h3>
+      ${role ? `<div class="jobtabs"><button data-jt="role" class="${jobTab === 'role' ? 'on' : ''}">${esc(roleName(role))} ${allJobs.filter(j => j.role === role).length}</button><button data-jt="all" class="${jobTab === 'all' ? 'on' : ''}">전체 ${allJobs.length}</button></div>` : ''}
       <div class="muted" style="margin:-4px 0 10px">${Object.entries(srcCnt).map(([k, v]) => `${k} ${v}`).join(' · ')} · 같은 공고는 하나로 합침</div>
       <div class="jobs">${jobs.length ? jobs.map(jobCard).join('') : '<div class="muted">현재 열린 공고가 없습니다.</div>'}</div>
     </div>
@@ -249,6 +270,7 @@ function openDetail(id, pan) {
     <div class="sec"><h3>다른 사이트에서 보기</h3><div class="ext">
       ${extLinks(c).map(([t, u]) => `<a target="_blank" rel="noopener" href="${u}">${t}</a>`).join('')}
     </div></div>`;
+  $('#detailBody').querySelectorAll('[data-jt]').forEach(b => b.onclick = () => { jobTab = b.dataset.jt; openDetail(id, false); });
   $('#detail').classList.add('open');
   $('#detail').setAttribute('aria-hidden', 'false');
   $('#detail').scrollTop = 0;

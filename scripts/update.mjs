@@ -4,7 +4,7 @@
 import fs from 'node:fs/promises';
 import {
   isCandidate, isStartup, buildCompany, wantedCompanyFromPage, wantedJobFromPage,
-  pickVcMatch, parseVcPage, pool, srJob, jkJob, gbJob, mergeJobs,
+  pickVcMatch, parseVcPage, pool, srJob, jkJob, gbJob, mergeJobs, classifyRole,
 } from './lib.mjs';
 import { npsHistory } from './nps.mjs';
 
@@ -111,7 +111,7 @@ const companies = Object.values(state.co)
     const b = buildCompany(c, state.vc[c.id], state.emp[c.id], byCid[c.id], state.nps[c.id]);
     const base = c.name.replace(/\(.*?\)/g, '').trim(), alias = (c.name.match(/\((.*?)\)/) || [])[1];
     const extra = [...(state.sr[c.id] || []).map(srJob), ...(state.jk[c.id] || []).map(jkJob), ...(state.gb[c.id] || []).map(gbJob)];
-    b.jobs = mergeJobs(b.jobs, extra, [c.name, base, alias].filter(Boolean));
+    b.jobs = mergeJobs(b.jobs, extra, [c.name, base, alias].filter(Boolean)).map(j => ({ ...j, role: classifyRole(j.t, j.cat) }));
     const jp = state.jp[c.id];
     if (jp) b.jp = { id: jp.jp, rate: jp.rate, tags: jp.tags || [] };
     const bl = state.bl[c.id];

@@ -26,6 +26,12 @@ export function sumChart(chart) {
   return { h12: h, l12: l, net12: h - l, hm: last12.length };
 }
 
+const cleanStage = s => {
+  if (!s) return null;
+  const m = String(s).match(/^(Pre-IPO|Pre-A|Pre-Series [A-Z]|Series [A-Z]|Seed|Angel|M&A|IPO|Bridge)/i);
+  return m ? m[1] : (String(s).length <= 12 ? s : null);
+};
+
 export function buildCompany(w, vc, emp, jobs, nps) {
   const tags = w.tags || [];
   const inv = tags.filter(([k]) => k === 17).map(([, t]) => t);
@@ -54,7 +60,7 @@ export function buildCompany(w, vc, emp, jobs, nps) {
     salesY: w.salesYear || null,
     ceo: w.ceo || (vc && vc.ceo) || null,
     cto: null,
-    stage: vc && vc.stage || null,
+    stage: cleanStage(vc && vc.stage),
     rounds: vc && vc.rounds || null,
     market: vc && vc.market || null,
     vc: vc && vc.vc || null,
@@ -236,4 +242,38 @@ export function gbJob(x) {
     career: x.career === '신입' ? '신입' : (e.min != null ? `경력 ${e.min}${e.max ? '~' + e.max : '+'}년` : x.career || null),
     posted: x.pub ? x.pub.slice(0, 10) : null, due: null, loc: x.addr || null,
   };
+}
+
+// ---- 직무 분류 ----
+export const ROLES = [
+  ['dev', '개발'], ['data', '데이터·AI'], ['qa', 'QA·테스트'], ['design', '디자인'], ['pm', '기획·PM'],
+  ['mkt', '마케팅'], ['sales', '영업·BD'], ['biz', '경영·HR·재무'], ['ops', '운영·CS'], ['etc', '기타'],
+];
+const RX = {
+  qa: /(^|[^a-z])q[ae]([^a-z]|$)|quality|품질|테스트|tester|sdet|test engineer/i,
+  data: /데이터|data|(^|[^a-z])ai([^a-z]|$)|머신러닝|딥러닝|machine learning|llm|분석가|analyst|scientist|mlops|추천|vision|nlp|인공지능/i,
+  design: /디자인|디자이너|designer|(^|[^a-z])ux|(^|[^a-z])ui([^a-z]|$)|bx|모션|영상 편집|일러스트/i,
+  pm: /기획|(^|[^a-z])pm([^a-z]|$)|(^|[^a-z])po([^a-z]|$)|product manager|product owner|프로덕트 매니저|프로덕트 오너|서비스 기획/i,
+  dev: /개발|engineer|엔지니어|developer|backend|frontend|백엔드|프론트|(^|[^a-z])ios|android|안드로이드|devops|(^|[^a-z])sre|인프라|풀스택|full.?stack|software|서버|security|보안|클라우드|cloud|firmware|펌웨어|임베디드|embedded|cto|tech lead|architect/i,
+  mkt: /마케팅|marketing|마케터|growth|그로스|퍼포먼스|(^|[^a-z])crm|콘텐츠|content|브랜드|brand|(^|[^a-z])pr([^a-z]|$)|홍보|광고|에디터|editor|커뮤니티|sns/i,
+  sales: /영업|세일즈|sales|(^|[^a-z])bd([^a-z]|$)|사업개발|business development|제휴|파트너십|partnership|(^|[^a-z])am([^a-z]|$)|account|b2b|수주|판매/i,
+  biz: /인사|(^|[^a-z])hr([^a-z]|$)|채용|recruit|talent|재무|회계|finance|accounting|법무|legal|경영|전략|strategy|총무|(^|[^a-z])ir([^a-z]|$)|people|노무|세무|투자|사업기획|비서|admin/i,
+  ops: /운영|(^|[^a-z])cs([^a-z]|$)|고객|(^|[^a-z])cx|상담|(^|[^a-z])md([^a-z]|$)|물류|scm|operation|매니저|오퍼레이|배송|센터|점장|큐레이터|코디네이터/i,
+};
+const CAT_MAP = {
+  '개발': 'dev', '정보보호': 'dev', '엔지니어링·설계': 'dev', '게임 제작': 'dev',
+  '경영·비즈니스': 'biz', 'HR': 'biz', '금융': 'biz', '법률·법집행기관': 'biz',
+  '마케팅·광고': 'mkt', '미디어': 'mkt', '영업': 'sales', '디자인': 'design',
+  '고객서비스·리테일': 'ops', '물류·무역': 'ops', '식·음료': 'ops',
+};
+export function classifyRole(title, cat) {
+  const t = String(title || '');
+  for (const k of ['qa', 'data', 'design', 'pm']) if (RX[k].test(t)) return k;
+  if (cat && CAT_MAP[cat]) {
+    const m = CAT_MAP[cat];
+    if (m === 'biz') { for (const k of ['mkt', 'sales', 'dev', 'ops']) if (RX[k].test(t)) return k; }
+    return m;
+  }
+  for (const k of ['dev', 'mkt', 'sales', 'biz', 'ops']) if (RX[k].test(t)) return k;
+  return 'etc';
 }

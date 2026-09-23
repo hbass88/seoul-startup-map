@@ -6,50 +6,55 @@
 <title>서울 스타트업 지도</title>
 <meta name="description" content="서울 투자유치 스타트업의 위치, 채용공고, 인원 변화, 연봉, 매출, 투자단계를 지도 한 장에서.">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.min.css">
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <header class="top">
   <div class="brand">
+    <span class="dot" aria-hidden="true"></span>
     <h1>서울 스타트업 지도</h1>
     <span class="meta" id="meta">불러오는 중</span>
   </div>
-  <div class="layer-toggle" role="group" aria-label="히트맵 기준">
-    <span class="lbl">히트맵</span>
-    <button data-heat="jobs" class="on">채용공고</button>
+  <div class="seg" role="group" aria-label="히트맵 기준">
+    <button data-heat="jobs" class="on">채용</button>
     <button data-heat="emp">인원</button>
-    <button data-heat="growth">인원 순증</button>
+    <button data-heat="growth">순증</button>
     <button data-heat="none">끄기</button>
   </div>
 </header>
 
+<nav class="roles" id="roles" aria-label="직무"></nav>
+
 <main class="layout">
   <aside class="side" id="side">
     <div class="filters">
-      <input id="q" type="search" placeholder="회사, 분야, 대표자 검색" autocomplete="off">
-      <div class="row">
-        <select id="f-ind"><option value="">전체 분야</option></select>
-        <select id="f-stage"><option value="">전체 투자단계</option></select>
+      <div class="search">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+        <input id="q" type="search" placeholder="회사, 공고, 대표자 검색" autocomplete="off">
       </div>
       <div class="row">
+        <select id="f-stage"><option value="">투자단계</option></select>
         <select id="f-size">
-          <option value="">전체 인원</option>
+          <option value="">인원</option>
           <option value="0-50">50명 이하</option>
           <option value="51-300">51~300명</option>
           <option value="301-100000">301명 이상</option>
         </select>
-        <select id="f-dist"><option value="">전체 구</option></select>
-      </div>
-      <div class="chips">
-        <label><input type="checkbox" id="f-hiring" checked> 채용중</label>
-        <label><input type="checkbox" id="f-fulltime"> 정규직 공고</label>
-        <label><input type="checkbox" id="f-foreign"> 외국계</label>
-        <label><input type="checkbox" id="f-growing"> 인원 순증 +</label>
+        <select id="f-dist"><option value="">지역</option></select>
       </div>
       <div class="row">
-        <select id="sort">
+        <select id="f-ind"><option value="">업종</option></select>
+      </div>
+      <div class="chips">
+        <label><input type="checkbox" id="f-hiring" checked><span>채용중</span></label>
+        <label><input type="checkbox" id="f-fulltime"><span>정규직</span></label>
+        <label><input type="checkbox" id="f-foreign"><span>외국계</span></label>
+        <label><input type="checkbox" id="f-growing"><span>인원 증가</span></label>
+      </div>
+      <div class="row between">
+        <span class="count" id="count"></span>
+        <select id="sort" class="ghost">
           <option value="jobs">공고 많은 순</option>
           <option value="recent">최근 공고 순</option>
           <option value="emp">인원 많은 순</option>
@@ -58,7 +63,6 @@
           <option value="sales">매출 순</option>
           <option value="founded">최근 설립 순</option>
         </select>
-        <span class="count" id="count"></span>
       </div>
     </div>
     <ul class="list" id="list"></ul>
@@ -71,7 +75,9 @@
   </section>
 
   <aside class="detail" id="detail" aria-hidden="true">
-    <button class="close" id="closeDetail" aria-label="닫기">×</button>
+    <button class="close" id="closeDetail" aria-label="닫기">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+    </button>
     <div id="detailBody"></div>
   </aside>
 </main>
